@@ -31,10 +31,17 @@ winman = bpy.types.WindowManager
 overlay = bpy.types.VIEW3D_PT_overlay
 
 font_id = 0
-position = (90,1800)
+
+position_1920px = (0.045,0.75)
+position_2560px = (0.0342,0.81)
+position_3840px = (0.0234,0.872)
+position = (0,0)
+
 gap = 22
 system = bpy.context.preferences.system
 dpi = int(system.dpi * system.pixel_size)
+
+
 
 class BetterStatsHandler:
     def __init__(self, context, prop, obj):
@@ -46,6 +53,9 @@ class BetterStatsHandler:
         self.vtx_normal_count = 0
         self.uv_vtx_count = 0
         self.tri_count = 0
+        self.screen_width = 0
+        self.screen_height = 0
+        self.screen_position = (0,0)
         self.font_size = context.window_manager.betterstats_font_size
         self.font_color = context.window_manager.betterstats_font_color
         
@@ -54,6 +64,8 @@ class BetterStatsHandler:
         self.depsgraph_handle = bpy.app.handlers.depsgraph_update_post.append(self.onDepsgraph)
 
     def onDepsgraph(self, scene, depsgraph):
+        self.screen_width = 0
+        self.screen_height = 0
         self.selected_objects = ""
         self.obj_count = 0
         self.total_obj_count = 0
@@ -63,8 +75,31 @@ class BetterStatsHandler:
         self.tri_count = 0
 
         selection = bpy.context.selected_objects
+
+        # Get Window Size
+
+        for window in bpy.context.window_manager.windows:
+            self.screen_width = window.width
+            self.screen_height = window.height
+
+        if self.screen_width > 2160:
+            for window in bpy.context.window_manager.windows:
+                self.screen_width = window.width
+                self.screen_height = window.height
+            self.screen_position = (self.screen_width * position_3840px[0], self.screen_height * position_3840px[1])
+        if self.screen_width < 3840 and self.screen_width > 1920:
+            for window in bpy.context.window_manager.windows:
+                self.screen_width = window.width
+                self.screen_height = window.height
+            self.screen_position = (self.screen_width * position_2560px[0], self.screen_height * position_2560px[1])
+        if self.screen_width == 1920:
+            for window in bpy.context.window_manager.windows:
+                self.screen_width = window.width
+                self.screen_height = window.height
+            self.screen_position = (self.screen_width * position_1920px[0], self.screen_height * position_1920px[1])        
+
+        print ("Screen Position is:" +str(self.screen_position))
         
-        print("selection is "+str(len(selection)))
         if len(selection) == 0:
             obj_to_count = [ob for ob in bpy.context.view_layer.objects if ob.visible_get()]
         else: 
@@ -113,28 +148,28 @@ class BetterStatsHandler:
         blf.size(font_id,self.font_size, dpi)
         blf.color(font_id, self.font_color[0], self.font_color[1], self.font_color[2], 1)
 
-        blf.position(font_id, position[0], position[1], 0)
+        blf.position(font_id, self.screen_position[0], self.screen_position[1], 0)
         if self.selected_objects == "":         
             blf.draw(font_id, "Better Stats: All")
         else:
             blf.draw(font_id, "Better Stats: %s" % self.selected_objects)
 
-        blf.position(font_id, position[0], position[1]-self.gap, 0)        
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap, 0)        
         blf.draw(font_id, "Stats for:")
 
-        blf.position(font_id, position[0], position[1]-self.gap*2, 0)
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*2, 0)
         blf.draw(font_id, "Objects:             %d/%d" % (self.obj_count, self.total_obj_count)) 
 
-        blf.position(font_id, position[0], position[1]-self.gap*3, 0)
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*3, 0)
         blf.draw(font_id, "Vertices:            %d" % self.vtx_count)
 
-        blf.position(font_id, position[0], position[1]-self.gap*4, 0)
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*4, 0)
         blf.draw(font_id, "Vertex Normals:      %d" % self.vtx_normal_count)
 
-        blf.position(font_id, position[0], position[1]-self.gap*5, 0)
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*5, 0)
         blf.draw(font_id, "UV Vertices:         %d" % self.uv_vtx_count)
 
-        blf.position(font_id, position[0], position[1]-self.gap*6, 0)
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*6, 0)
         blf.draw(font_id, "Triangles:           %d" % self.tri_count)
 
     def remove_handles(self):
@@ -176,7 +211,6 @@ def update_betterstats(self, context):
 def update_betterstats_size_color(self, context):
     winman = context.window_manager
     bpy.app.driver_namespace["BetterStats"].font_size = winman.betterstats_font_size
-    bpy.app.driver_namespace["BetterStats"].font_color = winman.betterstats_font_color
     bpy.app.driver_namespace["BetterStats"].font_color = winman.betterstats_font_color
     bpy.app.driver_namespace["BetterStats"].gap = gap*(winman.betterstats_font_size/10)
 
