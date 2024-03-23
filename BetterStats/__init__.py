@@ -3,7 +3,7 @@ bl_info = {
     "author" : "Sebastian Schneider",
     "description" : "Replacement for the original Statistics. Currently only works in Object Mode",
     "blender" : (3, 6, 0),
-    'version': (0, 1, 0 ,0),
+    'version': (0, 1, 0 ,1),
     "location" : "View3D",
     "warning" : "",
     "category" : "View3D",
