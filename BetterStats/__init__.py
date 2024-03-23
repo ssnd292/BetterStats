@@ -38,7 +38,8 @@ dpi = int(system.dpi * system.pixel_size)
 
 class BetterStatsHandler:
     def __init__(self, context, prop, obj):
-        self.obj = obj        
+        self.obj = obj
+        self.selected_objects = ""
         self.obj_count = 0
         self.total_obj_count = 0
         self.vtx_count = 0
@@ -47,23 +48,33 @@ class BetterStatsHandler:
         self.tri_count = 0
         self.font_size = context.window_manager.betterstats_font_size
         self.font_color = context.window_manager.betterstats_font_color
+        
         self.gap = 25
         self.draw_better_stats = bpy.types.SpaceView3D.draw_handler_add(self.draw_better_stats,(context,),'WINDOW', 'POST_PIXEL')
         self.depsgraph_handle = bpy.app.handlers.depsgraph_update_post.append(self.onDepsgraph)
 
     def onDepsgraph(self, scene, depsgraph):
+        self.selected_objects = ""
         self.obj_count = 0
         self.total_obj_count = 0
         self.vtx_count = 0
         self.vtx_normal_count = 0
         self.uv_vtx_count = 0
         self.tri_count = 0
+
+        selection = bpy.context.selected_objects
         
-        visible_objects = [ob for ob in bpy.context.view_layer.objects if ob.visible_get()]
+        print("selection is "+str(len(selection)))
+        if len(selection) == 0:
+            obj_to_count = [ob for ob in bpy.context.view_layer.objects if ob.visible_get()]
+        else: 
+            obj_to_count = selection
+            self.selected_objects = [obj.name for obj in selection]
+
         
-        for obj in visible_objects:
+        for obj in obj_to_count:
             if obj.type == 'MESH':
-                self.obj_count = len(visible_objects)
+                self.obj_count = len(obj_to_count)
                 self.total_obj_count = len(bpy.context.view_layer.objects)
                 self.vtx_count += len(obj.evaluated_get(depsgraph).data.vertices)
                 self.vtx_normal_count += self.get_normal_count(obj.evaluated_get(depsgraph).data)
@@ -102,23 +113,28 @@ class BetterStatsHandler:
         blf.size(font_id,self.font_size, dpi)
         blf.color(font_id, self.font_color[0], self.font_color[1], self.font_color[2], 1)
 
+        blf.position(font_id, position[0], position[1], 0)
+        if self.selected_objects == "":         
+            blf.draw(font_id, "Better Stats: All")
+        else:
+            blf.draw(font_id, "Better Stats: %s" % self.selected_objects)
 
-        blf.position(font_id, position[0], position[1], 0)        
-        blf.draw(font_id, "Better Stats:")
-
-        blf.position(font_id, position[0], position[1]-self.gap, 0)
-        blf.draw(font_id, "Objects:             %d/%d" % (self.obj_count, self.total_obj_count)) 
+        blf.position(font_id, position[0], position[1]-self.gap, 0)        
+        blf.draw(font_id, "Stats for:")
 
         blf.position(font_id, position[0], position[1]-self.gap*2, 0)
-        blf.draw(font_id, "Vertices:            %d" % self.vtx_count)
+        blf.draw(font_id, "Objects:             %d/%d" % (self.obj_count, self.total_obj_count)) 
 
         blf.position(font_id, position[0], position[1]-self.gap*3, 0)
-        blf.draw(font_id, "Vertex Normals:      %d" % self.vtx_normal_count)
+        blf.draw(font_id, "Vertices:            %d" % self.vtx_count)
 
         blf.position(font_id, position[0], position[1]-self.gap*4, 0)
-        blf.draw(font_id, "UV Vertices:         %d" % self.uv_vtx_count)
+        blf.draw(font_id, "Vertex Normals:      %d" % self.vtx_normal_count)
 
         blf.position(font_id, position[0], position[1]-self.gap*5, 0)
+        blf.draw(font_id, "UV Vertices:         %d" % self.uv_vtx_count)
+
+        blf.position(font_id, position[0], position[1]-self.gap*6, 0)
         blf.draw(font_id, "Triangles:           %d" % self.tri_count)
 
     def remove_handles(self):
