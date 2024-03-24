@@ -13,6 +13,8 @@ bl_info = {
 import bpy
 import blf
 
+from bpy.utils import register_class, unregister_class
+
 from bpy.props import (StringProperty,
                        BoolProperty,
                        IntProperty,
@@ -25,9 +27,9 @@ from bpy.types import (Panel,
                        Menu,
                        Operator,
                        PropertyGroup,
+                       AddonPreferences,
                        )
 
-winman = bpy.types.WindowManager
 overlay = bpy.types.VIEW3D_PT_overlay
 
 font_id = 0
@@ -41,7 +43,53 @@ gap = 22
 system = bpy.context.preferences.system
 dpi = int(system.dpi * system.pixel_size)
 
+def update_betterstats(self, context):
+    addon_prefs = context.preferences.addons[__package__].preferences
+    if addon_prefs.betterstats_show:
+        bpy.app.driver_namespace["BetterStats"] = BetterStatsHandler(context, None, context.object)
+    else:        
+        if "BetterStats" in bpy.app.driver_namespace:
+            bpy.app.driver_namespace["BetterStats"].remove_handles()
+            del bpy.app.driver_namespace["BetterStats"]
 
+def update_betterstats_size_color(self, context):
+    addon_prefs = context.preferences.addons[__package__].preferences
+    bpy.app.driver_namespace["BetterStats"].font_size = addon_prefs.betterstats_font_size
+    bpy.app.driver_namespace["BetterStats"].font_color = addon_prefs.betterstats_font_color
+    bpy.app.driver_namespace["BetterStats"].gap = gap*(addon_prefs.betterstats_font_size/10)
+
+
+class BetterStatsProps(AddonPreferences):
+    bl_idname = __name__
+
+
+    betterstats_show : BoolProperty(
+        name = "Better Stats",
+        default = False,
+        update = update_betterstats
+    )
+
+    betterstats_font_size : IntProperty(
+        name = "Font Size",
+        default = 11,
+        min = 1,
+        max = 32,
+        update = update_betterstats_size_color
+    )
+
+    betterstats_font_color : FloatVectorProperty(
+        name = "Font Color",
+        subtype = "COLOR",
+        default = (1.0,1.0,1.0,1.0),
+        size = 4,
+        update = update_betterstats_size_color
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "betterstats_show")
+        layout.prop(self, "betterstats_font_size")
+        layout.prop(self, "betterstats_font_color")
 
 class BetterStatsHandler:
     def __init__(self, context, prop, obj):
@@ -56,8 +104,8 @@ class BetterStatsHandler:
         self.screen_width = 0
         self.screen_height = 0
         self.screen_position = (0,0)
-        self.font_size = context.window_manager.betterstats_font_size
-        self.font_color = context.window_manager.betterstats_font_color
+        self.font_size = context.preferences.addons[__package__].preferences.betterstats_font_size
+        self.font_color = context.preferences.addons[__package__].preferences.betterstats_font_color
         
         self.gap = 25
         self.draw_better_stats = bpy.types.SpaceView3D.draw_handler_add(self.draw_better_stats,(context,),'WINDOW', 'POST_PIXEL')
@@ -98,7 +146,7 @@ class BetterStatsHandler:
                 self.screen_height = window.height
             self.screen_position = (self.screen_width * position_1920px[0], self.screen_height * position_1920px[1])        
 
-        print ("Screen Position is:" +str(self.screen_position))
+        #print ("Screen Position is:" +str(self.screen_position))
         
         if len(selection) == 0:
             obj_to_count = [ob for ob in bpy.context.view_layer.objects if ob.visible_get()]
@@ -119,7 +167,6 @@ class BetterStatsHandler:
 
     def get_uv_vtx_count(self,mesh):
         # Based on https://blender.stackexchange.com/a/44896
-
         uvs = []
         for loop in mesh.loops:
             uv_indices = mesh.uv_layers.active.data[loop.index].uv
@@ -149,13 +196,14 @@ class BetterStatsHandler:
         blf.color(font_id, self.font_color[0], self.font_color[1], self.font_color[2], 1)
 
         blf.position(font_id, self.screen_position[0], self.screen_position[1], 0)
-        if self.selected_objects == "":         
-            blf.draw(font_id, "Better Stats: All")
-        else:
-            blf.draw(font_id, "Better Stats: %s" % self.selected_objects)
+        blf.draw(font_id, "Better Stats")
 
-        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap, 0)        
-        blf.draw(font_id, "Stats for:")
+        blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap, 0)
+        if self.selected_objects == "":         
+            blf.draw(font_id, "Stats for: Scene")
+        else:
+           blf.draw(font_id, "Stats for: %s" % self.selected_objects)    
+        
 
         blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*2, 0)
         blf.draw(font_id, "Objects:             %d/%d" % (self.obj_count, self.total_obj_count)) 
@@ -177,75 +225,35 @@ class BetterStatsHandler:
         bpy.types.SpaceView3D.draw_handler_remove(self.draw_better_stats, 'WINDOW')
 
 
-
 def draw_better_stats_overlay(self, context):
     layout = self.layout
-    winman = context.window_manager
+    addon_prefs = context.preferences.addons[__package__].preferences
 
     layout.label(text="Better Stats")
     row = layout.row(align=True)
-    row.prop(winman, 'betterstats_show')
+    row.prop(addon_prefs, 'betterstats_show')
     layout.separator()
 
     row = layout.row(align=True)
-    row.prop(winman, "betterstats_font_size")
+    row.prop(addon_prefs, "betterstats_font_size")
     row = layout.row(align=True)
-    row.prop(winman, "betterstats_font_color")
+    row.prop(addon_prefs, "betterstats_font_color")
 
-    if winman.betterstats_show is True:
+    if addon_prefs.betterstats_show is True:
         bpy.context.space_data.overlay.show_stats = False
 
     if bpy.context.space_data.overlay.show_stats is True:
-        winman.betterstats_show = False
-
-
-def update_betterstats(self, context):
-    if self.betterstats_show:
-        bpy.app.driver_namespace["BetterStats"] = BetterStatsHandler(context, None, context.object)
-    else:        
-        if "BetterStats" in bpy.app.driver_namespace:
-            bpy.app.driver_namespace["BetterStats"].remove_handles()
-            del bpy.app.driver_namespace["BetterStats"]
-
-
-def update_betterstats_size_color(self, context):
-    winman = context.window_manager
-    bpy.app.driver_namespace["BetterStats"].font_size = winman.betterstats_font_size
-    bpy.app.driver_namespace["BetterStats"].font_color = winman.betterstats_font_color
-    bpy.app.driver_namespace["BetterStats"].gap = gap*(winman.betterstats_font_size/10)
-
-
+        addon_prefs.betterstats_show = False
 
 def register():
-    winman.betterstats_show = BoolProperty(
-        name = "Better Stats",
-        default = False,
-        update = update_betterstats
-    )
-
-    winman.betterstats_font_size = IntProperty(
-        name = "Font Size",
-        default = 11,
-        min = 1,
-        max = 32,
-        update = update_betterstats_size_color
-    )
-
-    winman.betterstats_font_color = FloatVectorProperty(
-        name = "Font Color",
-        subtype = "COLOR",
-        default = (1.0,1.0,1.0,1.0),
-        size = 4,
-        update = update_betterstats_size_color
-    )
+    register_class(BetterStatsProps)
 
     overlay.append(draw_better_stats_overlay)
 
 def unregister():
-    overlay.remove(draw_better_stats_overlay)
-    del winman.betterstats_show
-    del winman.betterstats_font_size
-    del winman.betterstats_font_color
 
+    overlay.remove(draw_better_stats_overlay)
+    unregister_class(BetterStatsProps)
+    
 if __name__ == "__main__":
     register()
