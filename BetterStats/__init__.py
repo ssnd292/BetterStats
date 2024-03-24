@@ -33,15 +33,10 @@ from bpy.types import (Panel,
 overlay = bpy.types.VIEW3D_PT_overlay
 
 font_id = 0
-
-position_1920px = (0.045,0.75)
-position_2560px = (0.0342,0.81)
-position_3840px = (0.0234,0.872)
-position = (0,0)
-
-gap = 22
+overlay_position = (90,-150)
+gap = 20
 system = bpy.context.preferences.system
-dpi = int(system.dpi * system.pixel_size)
+
 
 def update_betterstats(self, context):
     addon_prefs = context.preferences.addons[__package__].preferences
@@ -101,8 +96,7 @@ class BetterStatsHandler:
         self.vtx_normal_count = 0
         self.uv_vtx_count = 0
         self.tri_count = 0
-        self.screen_width = 0
-        self.screen_height = 0
+        self.area_height = 0
         self.screen_position = (0,0)
         self.font_size = context.preferences.addons[__package__].preferences.betterstats_font_size
         self.font_color = context.preferences.addons[__package__].preferences.betterstats_font_color
@@ -112,8 +106,7 @@ class BetterStatsHandler:
         self.depsgraph_handle = bpy.app.handlers.depsgraph_update_post.append(self.onDepsgraph)
 
     def onDepsgraph(self, scene, depsgraph):
-        self.screen_width = 0
-        self.screen_height = 0
+        self.area_height = 0
         self.selected_objects = ""
         self.obj_count = 0
         self.total_obj_count = 0
@@ -122,31 +115,8 @@ class BetterStatsHandler:
         self.uv_vtx_count = 0
         self.tri_count = 0
 
-        selection = bpy.context.selected_objects
-
-        # Get Window Size
-
-        for window in bpy.context.window_manager.windows:
-            self.screen_width = window.width
-            self.screen_height = window.height
-
-        if self.screen_width > 2160:
-            for window in bpy.context.window_manager.windows:
-                self.screen_width = window.width
-                self.screen_height = window.height
-            self.screen_position = (self.screen_width * position_3840px[0], self.screen_height * position_3840px[1])
-        if self.screen_width < 3840 and self.screen_width > 1920:
-            for window in bpy.context.window_manager.windows:
-                self.screen_width = window.width
-                self.screen_height = window.height
-            self.screen_position = (self.screen_width * position_2560px[0], self.screen_height * position_2560px[1])
-        if self.screen_width == 1920:
-            for window in bpy.context.window_manager.windows:
-                self.screen_width = window.width
-                self.screen_height = window.height
-            self.screen_position = (self.screen_width * position_1920px[0], self.screen_height * position_1920px[1])        
-
-        #print ("Screen Position is:" +str(self.screen_position))
+        selection = bpy.context.selected_objects     
+        
         
         if len(selection) == 0:
             obj_to_count = [ob for ob in bpy.context.view_layer.objects if ob.visible_get()]
@@ -192,6 +162,12 @@ class BetterStatsHandler:
     
 
     def draw_better_stats(self, context):
+        dpi = int(system.dpi * system.pixel_size)
+        for bl_area in bpy.context.window.screen.areas:
+            if bl_area.type == "VIEW_3D":
+                self.area_height = bl_area.height
+        
+        self.screen_position = (0 + overlay_position[0], self.area_height + overlay_position[1])  
         blf.size(font_id,self.font_size, dpi)
         blf.color(font_id, self.font_color[0], self.font_color[1], self.font_color[2], 1)
 
@@ -202,8 +178,7 @@ class BetterStatsHandler:
         if self.selected_objects == "":         
             blf.draw(font_id, "Stats for: Scene")
         else:
-           blf.draw(font_id, "Stats for: %s" % self.selected_objects)    
-        
+           blf.draw(font_id, "Stats for: %s" % self.selected_objects)            
 
         blf.position(font_id, self.screen_position[0], self.screen_position[1]-self.gap*2, 0)
         blf.draw(font_id, "Objects:             %d/%d" % (self.obj_count, self.total_obj_count)) 
@@ -245,6 +220,8 @@ def draw_better_stats_overlay(self, context):
     if bpy.context.space_data.overlay.show_stats is True:
         addon_prefs.betterstats_show = False
 
+
+    
 def register():
     register_class(BetterStatsProps)
 
